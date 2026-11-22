@@ -6,6 +6,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    true
+    #if DEBUG
+    Task { await SheetProbe.runIfAsked() }
+    #endif
+    return true
   }
 }
