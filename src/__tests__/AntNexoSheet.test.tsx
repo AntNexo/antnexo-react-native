@@ -11,7 +11,9 @@ jest.mock('../AntNexo', () => ({ AntNexo: mockAntNexo }));
 const { AntNexoSheet } =
   require('../AntNexoSheet') as typeof import('../AntNexoSheet');
 
-beforeEach(() => {
+beforeEach(async () => {
+  // a previous test's unmount schedules its close on a timer: let it fire before counting
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
   mockEnds.length = 0;
   mockAntNexo.show.mockClear();
   mockAntNexo.close.mockClear();
@@ -107,4 +109,19 @@ test('visible true, false, true at once keeps the one opening', async () => {
   expect(mockAntNexo.show).toHaveBeenCalledTimes(1);
   expect(mockAntNexo.close).not.toHaveBeenCalled();
   expect(onDismiss).not.toHaveBeenCalled();
+});
+
+test('re-opened while the previous sheet is still closing: a new opening after it ends', async () => {
+  const onDismiss = jest.fn();
+  const r = await render(<AntNexoSheet visible onDismiss={onDismiss} />);
+  await r.rerender(<AntNexoSheet visible={false} onDismiss={onDismiss} />);
+  await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  expect(mockAntNexo.close).toHaveBeenCalledTimes(1); // closing, not yet gone
+  await r.rerender(<AntNexoSheet visible onDismiss={onDismiss} />);
+  expect(mockAntNexo.show).toHaveBeenCalledTimes(1);
+  await act(async () => mockEnds[0]!()); // the old one is gone
+  expect(mockAntNexo.show).toHaveBeenCalledTimes(2);
+  expect(onDismiss).not.toHaveBeenCalled();
+  await act(async () => mockEnds[1]!());
+  expect(onDismiss).toHaveBeenCalledTimes(1);
 });

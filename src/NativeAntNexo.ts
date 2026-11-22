@@ -44,4 +44,5 @@ export interface Spec extends TurboModule {
   readonly onEvent: CodegenTypes.EventEmitter<NativeEvent>;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('AntNexo');
+// null where it isn't linked (web, Expo Go, a missing pod install): AntNexo then rejects with `unavailable`
+export default TurboModuleRegistry.get<Spec>('AntNexo');

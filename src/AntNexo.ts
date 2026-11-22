@@ -1,4 +1,4 @@
-import Native, { type NativeEvent } from './NativeAntNexo';
+import NativeModule, { type NativeEvent, type Spec } from './NativeAntNexo';
 import { AntNexoError, type AntNexoErrorCode } from './errors';
 import { validateConfig, validateShow } from './options';
 import type {
@@ -20,7 +20,17 @@ const CODES: readonly string[] = [
   'http',
   'bad_response',
   'network',
+  'unavailable',
 ];
+
+/** The native module, or an `unavailable` rejection where it isn't linked. */
+function native(): Spec {
+  if (NativeModule) return NativeModule;
+  throw new AntNexoError(
+    'unavailable',
+    "AntNexo: the native module isn't in this build (web, Expo Go, or pod install / a rebuild is missing)"
+  );
+}
 
 let configured = false;
 let tokenProvider: TokenProvider | null = null;
@@ -29,8 +39,8 @@ let presenting = false;
 let generation = 0;
 const listeners = new Set<(e: AntNexoEvent) => void>();
 
-Native.setWrapper(SDK_VERSION);
-Native.onEvent((raw) => {
+NativeModule?.setWrapper(SDK_VERSION);
+NativeModule?.onEvent((raw) => {
   const e = toEvent(raw);
   if (!e) return;
   for (const l of [...listeners]) {
@@ -120,7 +130,7 @@ export const AntNexo = {
   async configure(config: AntNexoConfig): Promise<void> {
     const c = validateConfig(config);
     try {
-      await Native.configure(c.host, c.workspace, c.options);
+      await native().configure(c.host, c.workspace, c.options);
     } catch (e) {
       throw toError(e);
     }
@@ -130,9 +140,10 @@ export const AntNexo = {
   /**
    * When your app has its own accounts: a provider of a fresh identify token signed by your backend with the
    * workspace's identify secret (never put the secret in the app). Called each time the sheet opens. `null` stops.
+   * On an account switch also call `logout()`: it clears the session and cancels an opening still waiting for the
+   * old token.
    */
   identify(provider: TokenProvider | null): void {
-    if (provider !== tokenProvider) generation++; // an opening waiting for the old provider's token never happens
     tokenProvider = provider;
   },
 
@@ -153,7 +164,7 @@ export const AntNexo = {
     try {
       const token = await identifyToken();
       if (gen !== generation) return; // closed or logged out meanwhile: the token may be the previous person's
-      await Native.show(o.tab, o.screenshot, token);
+      await native().show(o.tab, o.screenshot, token);
     } catch (e) {
       throw toError(e);
     } finally {
@@ -164,7 +175,7 @@ export const AntNexo = {
   /** Closes the sheet, as Done does (a `closed` event follows). */
   close(): void {
     generation++;
-    Native.close();
+    NativeModule?.close();
   },
 
   /** Whether a sheet is up or opening. */
@@ -175,7 +186,7 @@ export const AntNexo = {
   /** What's new: how many entries the person hasn't seen (for a badge on your own button). */
   async unreadCount(): Promise<number> {
     try {
-      return await Native.unreadCount();
+      return await native().unreadCount();
     } catch (e) {
       throw toError(e);
     }
@@ -185,7 +196,7 @@ export const AntNexo = {
   async logout(): Promise<void> {
     generation++;
     try {
-      await Native.logout();
+      await native().logout();
     } catch (e) {
       throw toError(e);
     }

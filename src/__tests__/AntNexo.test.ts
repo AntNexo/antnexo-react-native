@@ -244,15 +244,37 @@ describe('events', () => {
   });
 });
 
-test('identify() with a new provider cancels an opening waiting for the old one', async () => {
+test('identify() with a new provider leaves a pending opening alone (logout() is the account switch)', async () => {
   await configure();
   let release: (t: string) => void = () => {};
   api.AntNexo.identify(() => new Promise((r) => (release = r)));
   const p = api.AntNexo.show();
-  api.AntNexo.identify(async () => 'new-person');
-  release('old-person-jwt');
+  api.AntNexo.identify(async () => 'again');
+  release('jwt');
+  await flush();
+  expect(native.show).toHaveBeenCalledWith(null, false, 'jwt');
+  native.shows[0]!.end();
   await p;
-  expect(native.show).not.toHaveBeenCalled();
+});
+
+test('without the native module (web, Expo Go) importing works and calls reject with unavailable', async () => {
+  jest.resetModules();
+  jest.doMock('../NativeAntNexo', () => ({ __esModule: true, default: null }));
+  const m: typeof import('../AntNexo') = require('../AntNexo');
+  await expect(
+    m.AntNexo.configure({
+      host: 'https://splynx.antnexo.com',
+      workspace: 'splynx',
+    })
+  ).rejects.toMatchObject({ code: 'unavailable' });
+  await expect(m.AntNexo.unreadCount()).rejects.toMatchObject({
+    code: 'unavailable',
+  });
+  await expect(m.AntNexo.logout()).rejects.toMatchObject({
+    code: 'unavailable',
+  });
+  expect(() => m.AntNexo.close()).not.toThrow();
+  expect(m.AntNexo.addListener(() => {}).remove).toBeInstanceOf(Function);
 });
 
 describe('unreadCount and logout', () => {

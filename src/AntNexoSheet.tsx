@@ -12,13 +12,19 @@ export type AntNexoSheetProps = {
   screenshot?: boolean;
 };
 
+/** One AntNexo.show() this component started, until it resolves. */
+type Opening = {
+  done: boolean;
+  /** close() was sent: the sheet is on its way out, a re-open needs a new opening. */
+  closing: boolean;
+  ended: Promise<void>;
+  closeTimer?: ReturnType<typeof setTimeout>;
+};
+
 /**
  * The sheet as a component: `<AntNexoSheet visible={open} onDismiss={() => setOpen(false)} />`. It renders nothing
  * itself; the sheet is native.
  */
-/** One AntNexo.show() this component started, until it resolves. */
-type Opening = { done: boolean; closeTimer?: ReturnType<typeof setTimeout> };
-
 export function AntNexoSheet({
   visible,
   onDismiss,
@@ -40,25 +46,42 @@ export function AntNexoSheet({
 
   useEffect(() => {
     if (!visible) return;
+    const start = (after: Promise<void>): Opening => {
+      const o: Opening = {
+        done: false,
+        closing: false,
+        ended: Promise.resolve(),
+      };
+      o.ended = after
+        .then(() => {
+          // closed or unmounted while waiting for the previous sheet to go
+          if (o.closing || !mounted.current) return;
+          const { tab: t, screenshot: shot } = options.current;
+          return AntNexo.show({
+            ...(t ? { tab: t } : {}),
+            ...(shot ? { screenshot: true } : {}),
+          });
+        })
+        .catch((e) => console.error('AntNexo: the sheet could not open', e))
+        .finally(() => {
+          o.done = true;
+          // a newer opening took over (re-opened while this one was closing): it will dismiss when it ends
+          if (opening.current !== o) return;
+          opening.current = null;
+          if (mounted.current) dismiss.current();
+        });
+      return o;
+    };
+
     let o = opening.current;
-    if (o && !o.done) {
+    if (o && !o.done && !o.closing) {
       // re-run right after a cleanup (StrictMode, or visible false → true at once): keep the same opening
       clearTimeout(o.closeTimer);
       o.closeTimer = undefined;
     } else {
-      const cur: Opening = { done: false };
-      opening.current = o = cur;
-      const { tab: t, screenshot: shot } = options.current;
-      AntNexo.show({
-        ...(t ? { tab: t } : {}),
-        ...(shot ? { screenshot: true } : {}),
-      })
-        .catch((e) => console.error('AntNexo: the sheet could not open', e))
-        .finally(() => {
-          cur.done = true;
-          if (opening.current === cur) opening.current = null;
-          if (mounted.current) dismiss.current();
-        });
+      // nothing open, or the last one is closing: a new opening once it has gone
+      o = start(o && !o.done ? o.ended : Promise.resolve());
+      opening.current = o;
     }
     const cur = o;
     return () => {
@@ -66,7 +89,9 @@ export function AntNexoSheet({
       if (cur.done) return;
       cur.closeTimer = setTimeout(() => {
         cur.closeTimer = undefined;
-        if (!cur.done) AntNexo.close();
+        if (cur.done) return;
+        cur.closing = true;
+        AntNexo.close();
       }, 0);
     };
   }, [visible]);

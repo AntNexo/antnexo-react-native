@@ -5,9 +5,13 @@ export type AntNexoErrorCode =
   | 'not_configured'
   | 'http'
   | 'bad_response'
-  | 'network';
+  | 'network'
+  | 'unavailable';
 
-/** What AntNexo calls reject with. `status` is set for `http`. */
+/**
+ * What AntNexo calls reject with. `status` is set for `http`. `unavailable`: the native module isn't in this build
+ * (web, Expo Go, or `pod install` / a rebuild is missing).
+ */
 export class AntNexoError extends Error {
   readonly code: AntNexoErrorCode;
   readonly status?: number;

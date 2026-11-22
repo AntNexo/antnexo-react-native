@@ -12,6 +12,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.UiThreadUtil
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -67,8 +68,10 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
         AntNexo.close()
     }
 
+    // ATOMIC launches: the body and its catch run even if a JS reload cancelled the scope first, so every promise
+    // settles (a cancelled call rejects).
     override fun unreadCount(promise: Promise) {
-        scope.launch {
+        scope.launch(start = CoroutineStart.ATOMIC) {
             try {
                 promise.resolve(AntNexo.unreadCount())
             } catch (t: Throwable) {
@@ -78,7 +81,7 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
     }
 
     override fun logout(promise: Promise) {
-        scope.launch {
+        scope.launch(start = CoroutineStart.ATOMIC) {
             try {
                 AntNexo.identify(null)
                 AntNexo.logout()
