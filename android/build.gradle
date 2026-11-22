@@ -1,0 +1,53 @@
+ext.ReactNative = [
+  minSdkVersion: 24,
+  compileSdkVersion: 36
+]
+
+ext.getExtOrDefault = { prop ->
+  if (rootProject.ext.has(prop)) {
+    return rootProject.ext.get(prop)
+  }
+
+  return ReactNative[prop]
+}
+
+
+apply plugin: "com.android.library"
+
+if (project.extensions.findByName("kotlin") == null) {
+  apply plugin: "kotlin-android"
+}
+
+
+apply plugin: "com.facebook.react"
+
+android {
+  // com.antnexo, like the Android SDK: its vendored code and resources (src/main/vendor) compile unchanged
+  namespace "com.antnexo"
+
+  compileSdkVersion getExtOrDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrDefault("minSdkVersion")
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += "src/main/vendor/kotlin"
+      res.srcDirs += "src/main/vendor/res"
+    }
+  }
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+  // the vendored Android SDK's dependencies, at its versions (antnexo-android gradle/libs.versions.toml)
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0"
+  implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
+  implementation "androidx.webkit:webkit:1.18.0"
+  implementation "androidx.browser:browser:1.10.0"
+  implementation "androidx.activity:activity-ktx:1.13.0"
+  implementation "androidx.core:core-ktx:1.17.0"
+
+  testImplementation "junit:junit:4.13.2"
+}

@@ -1,0 +1,86 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Every push and PR: JS checks, the vendored sources against their tags, the Android example build.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Lint, typecheck, test, build the package
+        run: |
+          yarn lint
+          yarn typecheck
+          yarn test --ci
+          yarn prepare
+
+      - name: Vendored native SDKs match their tags
+        run: scripts/vendor.test.sh
+
+      - name: Install JDK
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Android unit tests and the example
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx6g'
+        working-directory: example/android
+        run: ./gradlew --no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a :antnexo_react-native:testDebugUnitTest assembleDebug
+
+  # The iOS example on macOS (minutes cost 10x): release tags and by hand only.
+  ios:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      RCT_USE_RN_DEP: 1
+      RCT_USE_PREBUILT_RNCORE: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Pods
+        working-directory: example
+        run: |
+          bundle install
+          bundle exec pod install --project-directory=ios
+
+      - name: Build the example for the simulator
+        working-directory: example/ios
+        run: >
+          xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ReactNativeExample -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build
