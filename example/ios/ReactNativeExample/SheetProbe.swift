@@ -4,7 +4,9 @@ import Foundation
 
 /// Scripted simulator checks, example app only: with `-probe 1` it waits for the sheet the JS scenario opened
 /// (`-scenario show`), logs the bridge the page got, then runs `-js1 "<code>"` … `-js9` in the page 3 s apart, logging
-/// to Documents/probe.log (`xcrun simctl get_app_container booted antnexo.reactnative.example data`).
+/// to Documents/probe.log (`xcrun simctl get_app_container booted antnexo.reactnative.example data`). Each step must
+/// end in a value (`…; 'ok'`): WKWebView's async evaluateJavaScript traps on undefined or null, and the board's CSP
+/// forbids eval, so the probe can't wrap it.
 @MainActor
 enum SheetProbe {
   static let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

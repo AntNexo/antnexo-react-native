@@ -143,7 +143,7 @@ Calls reject with `AntNexoError` and a `code`:
 |---|---|
 | `invalid_host`, `invalid_workspace`, `invalid_options` | `configure` / `show` got a bad value |
 | `not_configured` | `show` before `configure` |
-| `network`, `http` (with `status`), `bad_response` | `unreadCount` couldn't read the changelog |
+| `network`, `http` (with `status`), `bad_response` | `unreadCount` couldn't read the changelog (`network` also stands for any unexpected native failure) |
 | `unavailable` | the native module isn't in this build (web, Expo Go, `pod install` or a rebuild missing) |
 
 ## Privacy
@@ -177,8 +177,10 @@ shows them on the post in the admin; erasing a person removes them.
 `example/` is a bare React Native app using the package from source: `yarn`, then `yarn example ios` or
 `yarn example android`. For scripted checks it takes launch options — iOS launch arguments
 (`-host … -workspace … -identify <token> -scenario show|roadmap|screenshot|sheet`, plus `-probe 1 -js1 "<code>"` in
-debug builds to run JS in the sheet and log to the app's Documents/probe.log), Android intent extras (`--es scenario
-show`; the debug build allows WebView debugging over Chrome DevTools).
+debug builds to run JS in the sheet and log to the app's Documents/probe.log), Android intent extras (`am start -S … --es scenario
+show`: `-S` restarts the app, since a running one keeps its first launch options; the debug build allows WebView
+debugging over Chrome DevTools). The example allows plain HTTP to `*.localhost` for local boards; an app never needs
+that.
 
 ## Licence
 

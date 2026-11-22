@@ -76,30 +76,31 @@ export default function App(props: Launch) {
     const sub = AntNexo.addListener((e: AntNexoEvent) => {
       note(`event ${JSON.stringify(e)}`);
       if (e.type === 'unread') setBadge(e.count);
+      if (e.type === 'closed') refreshBadge();
     });
     return () => sub.remove();
-  }, [note]);
+  }, [note, refreshBadge]);
 
   useEffect(() => {
     if (ready) refreshBadge();
   }, [ready, refreshBadge]);
 
-  const scenario = launchOption(props, 'scenario');
-  useEffect(() => {
-    if (!ready || !scenario) return;
-    note(`scenario ${scenario}`);
-    if (scenario === 'show') AntNexo.show().then(() => note('show resolved'));
-    if (scenario === 'roadmap') AntNexo.show({ tab: 'roadmap' });
-    if (scenario === 'screenshot') AntNexo.show({ screenshot: true });
-    if (scenario === 'sheet') setSheet(true);
-    // runs once per launch
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
   const show = (o?: Parameters<typeof AntNexo.show>[0]) =>
     AntNexo.show(o)
       .then(() => note('show resolved'))
       .catch((e) => note(`show: ${e.code}`));
+
+  const scenario = launchOption(props, 'scenario');
+  useEffect(() => {
+    if (!ready || !scenario) return;
+    note(`scenario ${scenario}`);
+    if (scenario === 'show') show();
+    if (scenario === 'roadmap') show({ tab: 'roadmap' });
+    if (scenario === 'screenshot') show({ screenshot: true });
+    if (scenario === 'sheet') setSheet(true);
+    // runs once per launch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -116,7 +117,7 @@ export default function App(props: Launch) {
       />
       <Button
         title={`What's new${badge ? ` (${badge})` : ''}`}
-        onPress={() => show({ tab: 'changelog' }).then(refreshBadge)}
+        onPress={() => show({ tab: 'changelog' })}
       />
 
       <View style={styles.row}>
@@ -154,7 +155,9 @@ export default function App(props: Launch) {
         onPress={() => {
           setToken('');
           AntNexo.identify(null);
-          AntNexo.logout().then(() => note('logged out'));
+          AntNexo.logout()
+            .then(() => note('logged out'))
+            .catch((e) => note(`logout: ${e.code}`));
         }}
       />
 
