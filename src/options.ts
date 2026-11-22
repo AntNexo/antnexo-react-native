@@ -38,7 +38,9 @@ function strings(
   if (v === undefined) return undefined;
   if (
     !Array.isArray(v) ||
-    v.some((x) => typeof x !== 'string' || (allowed && !allowed.includes(x)))
+    v.some(
+      (x) => typeof x !== 'string' || !x || (allowed && !allowed.includes(x))
+    )
   )
     throw bad(name);
   return [...v];
@@ -66,6 +68,7 @@ export function validateConfig(c: AntNexoConfig): NativeConfig {
   const tab = oneOf('tab', c.tab, TABS);
   if (tab) o.tab = tab as FeedbackTab;
   const tabs = strings('tabs', c.tabs, TABS);
+  if (tabs && tabs.length === 0) throw bad('tabs');
   if (tabs) o.tabs = tabs as FeedbackTab[];
   const boards = strings('boards', c.boards);
   if (boards) o.boards = boards;

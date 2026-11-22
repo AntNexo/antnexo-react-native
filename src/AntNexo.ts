@@ -132,6 +132,7 @@ export const AntNexo = {
    * workspace's identify secret (never put the secret in the app). Called each time the sheet opens. `null` stops.
    */
   identify(provider: TokenProvider | null): void {
+    if (provider !== tokenProvider) generation++; // an opening waiting for the old provider's token never happens
     tokenProvider = provider;
   },
 

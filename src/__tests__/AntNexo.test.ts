@@ -244,6 +244,17 @@ describe('events', () => {
   });
 });
 
+test('identify() with a new provider cancels an opening waiting for the old one', async () => {
+  await configure();
+  let release: (t: string) => void = () => {};
+  api.AntNexo.identify(() => new Promise((r) => (release = r)));
+  const p = api.AntNexo.show();
+  api.AntNexo.identify(async () => 'new-person');
+  release('old-person-jwt');
+  await p;
+  expect(native.show).not.toHaveBeenCalled();
+});
+
 describe('unreadCount and logout', () => {
   test('unreadCount passes the number through', async () => {
     await expect(api.AntNexo.unreadCount()).resolves.toBe(3);

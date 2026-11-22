@@ -16,6 +16,9 @@ export type AntNexoSheetProps = {
  * The sheet as a component: `<AntNexoSheet visible={open} onDismiss={() => setOpen(false)} />`. It renders nothing
  * itself; the sheet is native.
  */
+/** One AntNexo.show() this component started, until it resolves. */
+type Opening = { done: boolean; closeTimer?: ReturnType<typeof setTimeout> };
+
 export function AntNexoSheet({
   visible,
   onDismiss,
@@ -27,6 +30,7 @@ export function AntNexoSheet({
   const options = useRef({ tab, screenshot });
   options.current = { tab, screenshot };
   const mounted = useRef(true);
+  const opening = useRef<Opening | null>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -36,20 +40,34 @@ export function AntNexoSheet({
 
   useEffect(() => {
     if (!visible) return;
-    let open = true;
-    const o = options.current;
-    AntNexo.show({
-      ...(o.tab ? { tab: o.tab } : {}),
-      ...(o.screenshot ? { screenshot: true } : {}),
-    })
-      .catch((e) => console.error('AntNexo: the sheet could not open', e))
-      .finally(() => {
-        open = false;
-        if (mounted.current) dismiss.current();
-      });
+    let o = opening.current;
+    if (o && !o.done) {
+      // re-run right after a cleanup (StrictMode, or visible false → true at once): keep the same opening
+      clearTimeout(o.closeTimer);
+      o.closeTimer = undefined;
+    } else {
+      const cur: Opening = { done: false };
+      opening.current = o = cur;
+      const { tab: t, screenshot: shot } = options.current;
+      AntNexo.show({
+        ...(t ? { tab: t } : {}),
+        ...(shot ? { screenshot: true } : {}),
+      })
+        .catch((e) => console.error('AntNexo: the sheet could not open', e))
+        .finally(() => {
+          cur.done = true;
+          if (opening.current === cur) opening.current = null;
+          if (mounted.current) dismiss.current();
+        });
+    }
+    const cur = o;
     return () => {
-      // visible turned off, or the component went away, while the sheet was still up
-      if (open) AntNexo.close();
+      // visible turned off or unmounted while the sheet is up: close it, unless the effect runs again at once
+      if (cur.done) return;
+      cur.closeTimer = setTimeout(() => {
+        cur.closeTimer = undefined;
+        if (!cur.done) AntNexo.close();
+      }, 0);
     };
   }, [visible]);
 

@@ -23,7 +23,8 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
     private val listener: (AntNexoEvent) -> Unit = { e -> emitOnEvent(Arguments.makeNativeMap(eventMap(e))) }
 
     init {
-        AntNexo.addEventListener(listener)
+        // the SDK's listener list is main-thread only
+        UiThreadUtil.runOnUiThread { AntNexo.addEventListener(listener) }
     }
 
     @OptIn(AntNexoWrapperApi::class)
@@ -53,8 +54,12 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
             }
             // this opening's token only: the next show() sets its own (or none)
             AntNexo.identify(token?.takeIf { it.isNotEmpty() }?.let { t -> TokenProvider { t } })
-            // resolves when the sheet is gone: closed, or it couldn't open
-            AntNexo.show(activity, tabOf(tab), screenshot, onClosed = { promise.resolve(null) })
+            // resolves when the sheet is gone: closed, or it couldn't open; then the token goes, so no later opening
+            // (native or Compose) reuses it
+            AntNexo.show(activity, tabOf(tab), screenshot, onClosed = {
+                AntNexo.identify(null)
+                promise.resolve(null)
+            })
         }
     }
 
@@ -75,6 +80,7 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
     override fun logout(promise: Promise) {
         scope.launch {
             try {
+                AntNexo.identify(null)
                 AntNexo.logout()
                 promise.resolve(null)
             } catch (t: Throwable) {
@@ -85,7 +91,7 @@ class AntNexoModule(reactContext: ReactApplicationContext) : NativeAntNexoSpec(r
 
     /** The JS bundle reloaded or the app is going away: no events into a dead context. An open sheet stays usable. */
     override fun invalidate() {
-        AntNexo.removeEventListener(listener)
+        UiThreadUtil.runOnUiThread { AntNexo.removeEventListener(listener) }
         scope.cancel()
         super.invalidate()
     }

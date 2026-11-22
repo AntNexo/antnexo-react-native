@@ -88,6 +88,8 @@ describe('validateConfig', () => {
     { tabs: 'new' },
     { tabs: ['new', 'home'] },
     { boards: [1] },
+    { boards: [''] },
+    { tabs: [] },
     { prompts: 'on' },
     { whatsNew: 'sometimes' },
     { color: 5 },

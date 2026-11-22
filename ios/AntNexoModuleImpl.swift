@@ -4,25 +4,31 @@ import Foundation
 /// forwards to it. JS validated the values already; anything unknown is left out here rather than thrown.
 @objc(AntNexoModuleImpl)
 public final class AntNexoModuleImpl: NSObject {
-    /// Sends an event to JS (`NativeEvent`).
+    /// Sends an event to JS (`NativeEvent`). Main thread only.
     @objc public var emit: (([String: Any]) -> Void)?
+
+    /// The module events go to: the newest one (a JS reload makes a new module before the old one is invalidated).
+    @MainActor private static weak var current: AntNexoModuleImpl?
+
+    // Every call reaches the SDK through `Task { @MainActor in }` from RN's module queue, in call order.
 
     @objc public override init() {
         super.init()
-        DispatchQueue.main.async { [weak self] in
-            AntNexo.onEvent = { e in self?.emit?(Self.eventMap(e)) }
+        Task { @MainActor [weak self] in
+            Self.current = self
+            AntNexo.onEvent = { e in Self.current?.emit?(Self.eventMap(e)) }
         }
     }
 
     @objc public func setWrapper(_ sdk: String) {
-        DispatchQueue.main.async { AntNexo.setWrapper(platform: .reactNative, sdk: sdk) }
+        Task { @MainActor in AntNexo.setWrapper(platform: .reactNative, sdk: sdk) }
     }
 
     @objc public func configure(_ host: String, workspace: String, options: [String: Any],
                                 resolve: @escaping (Any?) -> Void,
                                 reject: @escaping (String, String, [String: Any]?) -> Void) {
         let o = Self.feedbackOptions(options)
-        DispatchQueue.main.async {
+        Task { @MainActor in
             do {
                 guard let url = URL(string: host) else { throw AntNexoError.invalidHost }
                 try AntNexo.configure(host: url, workspace: workspace, options: o)
@@ -34,10 +40,9 @@ public final class AntNexoModuleImpl: NSObject {
         }
     }
 
-    /// Resolves when the sheet is gone: closed, or it couldn't open.
+    /// Resolves when the sheet is gone: closed, or it couldn't open. The token is for this opening only.
     @objc public func show(_ tab: String?, screenshot: Bool, token: String?, resolve: @escaping (Any?) -> Void) {
         Task { @MainActor in
-            // this opening's token only: the next show() sets its own (or none)
             if let token, !token.isEmpty {
                 AntNexo.identify { token }
             } else {
@@ -45,11 +50,13 @@ public final class AntNexoModuleImpl: NSObject {
             }
             await AntNexo.present(from: nil, tab: tab.flatMap(FeedbackTab.init(rawValue:)), screenshot: screenshot,
                                   onClose: { resolve(nil) })
+            // prepare() has read the token: drop it, so no later opening (native or a SwiftUI modifier) reuses it
+            AntNexo.identify(nil)
         }
     }
 
     @objc public func close() {
-        DispatchQueue.main.async { AntNexo.close() }
+        Task { @MainActor in AntNexo.close() }
     }
 
     @objc public func unreadCount(_ resolve: @escaping (Any?) -> Void,
@@ -66,15 +73,19 @@ public final class AntNexoModuleImpl: NSObject {
 
     @objc public func logout(_ resolve: @escaping (Any?) -> Void) {
         Task { @MainActor in
+            AntNexo.identify(nil)
             await AntNexo.logout()
             resolve(nil)
         }
     }
 
     /// The JS bundle reloaded or the app is going away: no events into a dead context. An open sheet stays usable.
+    /// Only the current module stops events; an old one invalidated late leaves the new one's alone.
     @objc public func invalidate() {
-        emit = nil
-        DispatchQueue.main.async { AntNexo.onEvent = nil }
+        Task { @MainActor in
+            self.emit = nil
+            if Self.current === self { Self.current = nil }
+        }
     }
 
     static func feedbackOptions(_ m: [String: Any]) -> FeedbackOptions {

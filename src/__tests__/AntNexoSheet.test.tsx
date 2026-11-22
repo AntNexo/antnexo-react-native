@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { render, act } from '@testing-library/react-native';
 
 const mockEnds: Array<() => void> = [];
@@ -43,6 +44,7 @@ test('visible turned off while open closes it', async () => {
   const onDismiss = jest.fn();
   const r = await render(<AntNexoSheet visible onDismiss={onDismiss} />);
   await r.rerender(<AntNexoSheet visible={false} onDismiss={onDismiss} />);
+  await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
   expect(mockAntNexo.close).toHaveBeenCalledTimes(1);
   await act(async () => mockEnds[0]!());
   expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -52,6 +54,7 @@ test('unmounting while open closes it, and no onDismiss after unmount', async ()
   const onDismiss = jest.fn();
   const r = await render(<AntNexoSheet visible onDismiss={onDismiss} />);
   await r.unmount();
+  await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
   expect(mockAntNexo.close).toHaveBeenCalledTimes(1);
   await act(async () => mockEnds[0]!());
   expect(onDismiss).not.toHaveBeenCalled();
@@ -78,4 +81,30 @@ test('the latest onDismiss is called', async () => {
   await act(async () => mockEnds[0]!());
   expect(first).not.toHaveBeenCalled();
   expect(second).toHaveBeenCalledTimes(1);
+});
+
+test('StrictMode (mount, cleanup, mount): one opening, not closed, one onDismiss', async () => {
+  const onDismiss = jest.fn();
+  await render(
+    <StrictMode>
+      <AntNexoSheet visible onDismiss={onDismiss} />
+    </StrictMode>
+  );
+  await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  expect(mockAntNexo.show).toHaveBeenCalledTimes(1);
+  expect(mockAntNexo.close).not.toHaveBeenCalled();
+  expect(onDismiss).not.toHaveBeenCalled();
+  await act(async () => mockEnds[0]!());
+  expect(onDismiss).toHaveBeenCalledTimes(1);
+});
+
+test('visible true, false, true at once keeps the one opening', async () => {
+  const onDismiss = jest.fn();
+  const r = await render(<AntNexoSheet visible onDismiss={onDismiss} />);
+  await r.rerender(<AntNexoSheet visible={false} onDismiss={onDismiss} />);
+  await r.rerender(<AntNexoSheet visible onDismiss={onDismiss} />);
+  await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  expect(mockAntNexo.show).toHaveBeenCalledTimes(1);
+  expect(mockAntNexo.close).not.toHaveBeenCalled();
+  expect(onDismiss).not.toHaveBeenCalled();
 });
