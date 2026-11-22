@@ -1,5 +1,5 @@
 #import <AntNexoSpec/AntNexoSpec.h>
 
-@interface AntNexo : NSObject <NativeAntNexoSpec>
+@interface AntNexo : NativeAntNexoSpecBase <NativeAntNexoSpec>
 
 @end
