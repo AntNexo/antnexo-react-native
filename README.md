@@ -22,10 +22,10 @@ are theirs, compiled into this package. No other native dependency.
 
 ## Install
 
-From GitHub for now (npm follows):
+From the GitHub release for now (npm follows); the release asset is the built package:
 
 ```sh
-npm install github:AntNexo/antnexo-react-native#v1.0.0
+npm install https://github.com/AntNexo/antnexo-react-native/releases/download/v1.0.0/antnexo-react-native-1.0.0.tgz
 cd ios && pod install
 ```
 
