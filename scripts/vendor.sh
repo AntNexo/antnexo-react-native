@@ -16,8 +16,8 @@ check=0
 
 swift_repo="${ANTNEXO_SWIFT_REPO:-https://github.com/AntNexo/antnexo-swift.git}"
 android_repo="${ANTNEXO_ANDROID_REPO:-https://github.com/AntNexo/antnexo-android.git}"
-swift_tag="$(node -p "require('$root/vendor.json').swift.tag")"
-android_tag="$(node -p "require('$root/vendor.json').android.tag")"
+swift_tag="$(node -p 'require(process.argv[1]).swift.tag' "$root/vendor.json")"
+android_tag="$(node -p 'require(process.argv[1]).android.tag' "$root/vendor.json")"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -61,7 +61,7 @@ for m in AntNexoCore AntNexo; do
   cp -R "$work/swift/Sources/$m" "$ios/$m"
 done
 while IFS= read -r -d '' f; do
-  perl -ne 'next if /^(\@_exported )?import AntNexoCore$/; s/\bAntNexoCore\./AntNexoReactNative./g; print' "$f" >"$f.tmp"
+  perl -ne 'next if /^\s*(\@_exported\s+|(?:public|package|internal|fileprivate|private)\s+)?import\s+AntNexoCore\b/; s/\bAntNexoCore\./AntNexoReactNative./g; print' "$f" >"$f.tmp"
   mv "$f.tmp" "$f"
   header "$f" antnexo-swift "$swift_tag" "$swift_sha"
 done < <(find "$ios" -type f -name '*.swift' -print0)
@@ -87,10 +87,11 @@ fs.writeFileSync(file, JSON.stringify(v, null, 2) + "\n");
 if [[ $check == 1 ]]; then
   status=0
   for p in ios/vendor android/src/main/vendor android/src/main/AndroidManifest.xml vendor.json; do
-    diff -r "$out/$p" "$root/$p" >/dev/null 2>&1 || {
-      echo "vendor.sh --check: $p differs from $swift_tag / $android_tag (run scripts/vendor.sh)" >&2
+    if ! d="$(diff -r -x .DS_Store "$out/$p" "$root/$p" 2>&1)"; then
+      echo "vendor.sh --check: $p differs from $swift_tag / $android_tag (run scripts/vendor.sh):" >&2
+      echo "$d" | head -20 >&2
       status=1
-    }
+    fi
   done
   exit $status
 fi
