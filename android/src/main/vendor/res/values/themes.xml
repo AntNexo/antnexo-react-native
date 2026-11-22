@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vendored from AntNexo/antnexo-android v1.1.0 (4e1ed06e7e3d5977e2be854a3753d95750e50b2d) by scripts/vendor.sh. Do not edit. -->
+<resources>
+    <!-- A platform theme (no AppCompat/Material dependency); its light/dark also sets the WebView's
+         prefers-color-scheme when the app follows the system. -->
+    <style name="AntNexo.Sheet" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

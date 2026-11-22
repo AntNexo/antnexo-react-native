@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vendored from AntNexo/antnexo-android v1.1.0 (4e1ed06e7e3d5977e2be854a3753d95750e50b2d) by scripts/vendor.sh. Do not edit. -->
+<resources>
+    <string name="antnexo_done">Done</string>
+    <string name="antnexo_load_failed">Couldn’t load feedback.</string>
+    <string name="antnexo_try_again">Try again</string>
+    <string name="antnexo_outdated_webview">Couldn’t load feedback. Update Android System WebView and try again.</string>
+</resources>
